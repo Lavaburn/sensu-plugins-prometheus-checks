@@ -18,17 +18,41 @@ module Sensu
         # Execute query informed on check's configuration and makes no
         # modifications on value.
         def custom(cfg)
+          source_tpl = false
+          if cfg.key('definition')
+            definition = cfg['definition']
+            if definition.key('source')
+              source_tpl = definition['source']
+            end
+          end
+          
+          # Simpler: If definition source does not exist 
+          source_label = cfg['source_label'] || 'app'
+          
           metrics = []
           @client.query(cfg['query']).each do |result|
-            source = if result['metric'].key? 'app'
-                       result['metric']['app']
-                     else
-                       result['metric']['instance']
-                     end
-
+            if source_tpl 
+              source = render_string(source_tpl, result['metric'])
+            else
+              source = if result['metric'].key? source_label
+                         result['metric'][source_label]
+                       else
+                         result['metric']['instance']
+                       end
+            end
+            
+            definition_rendered = {}
+            if cfg.key('definition')
+              labels = result['metric']
+              labels['SOURCE'] = source
+              
+              definition_rendered = render_hash(cfg['definition'], labels)
+            end
+            
             metrics << {
-              'source' => source,
-              'value' => result['value'][1]
+              'source'      => source,
+              'value'       => result['value'][1],
+              'custom_data' => definition_rendered
             }
           end
           metrics
@@ -264,6 +288,36 @@ module Sensu
             'root'
           else
             disk.gsub(%r{^/}, '').gsub(%r{/$}, '').gsub(%r{/}, '_')
+          end
+        end
+        
+        def render_hash(raw, data)
+          rendered = {}
+          raw.each do |k, v|
+            if v.is_a?(Hash)
+              rendered[k] = render_hash(v, data)
+            elsif v.is_a?(String)
+              rendered[k] = render_string(v, data)
+            else 
+              rendered[k] = v
+            end
+          end
+          
+          rendered    
+        end
+        
+        def render_string(template, data)
+          match = /TEMPLATE_(.*)_TEMPLATE/
+          
+          lookup_key = template.match(match) { |m|
+            m.captures
+          }
+          
+          if (lookup_key == nil)
+            template            
+          else
+            replacement = data[lookup_key]
+            template.sub(match, replacement)
           end
         end
       end

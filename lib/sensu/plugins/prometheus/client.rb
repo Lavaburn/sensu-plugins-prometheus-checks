@@ -11,8 +11,8 @@ module Sensu
         include Sensu::Plugins::Utils::Log
 
         # Instantiates the http-client with `prometheus_endpoint`.
-        def initialize
-          host, port = prometheus_endpoint.split(':')
+        def initialize(config)
+          host, port = prometheus_endpoint(config).split(':')
           log.info("Prometheus at '#{host}':'#{port}'")
           @client = Net::HTTP.new(host, port)
           @client.read_timeout = 3
@@ -50,10 +50,22 @@ module Sensu
 
         # Reads `PROMETHEUS_ENDPOINT` from environment or use default localhost,
         # applies validation to make sure ':' is present.
-        def prometheus_endpoint
-          endpoint = ENV['PROMETHEUS_ENDPOINT'] || '127.0.0.1:9090'
-          raise "Invalid endpoint 'PROMETHEUS_ENDPOINT=" + endpoint + "'" \
-            unless endpoint.include?(':')
+        def prometheus_endpoint(config)
+          if config.key?('prometheus')
+            prom_cfg = config['prometheus']
+            unless prom_cfg.key?('endpoint')
+              msg = "prometheus configuration is a Hash containing: endpoint"
+              log.error(msg)
+              raise(msg)
+            end
+ 
+            endpoint = prom_cfg['endpoint']
+          else  
+            endpoint = ENV['PROMETHEUS_ENDPOINT'] || '127.0.0.1:9090'
+          end
+          
+          raise "Invalid endpoint 'PROMETHEUS_ENDPOINT=" + endpoint + "'" unless endpoint.include?(':')
+          
           endpoint
         end
       end

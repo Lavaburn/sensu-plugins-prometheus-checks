@@ -6,7 +6,17 @@ module Sensu
       module Checks
         # Given current result, warning and critical levels, it will return a
         # integer with the current level, zero is success.
-        def evaluate(result, warn, crit)
+        def evaluate(threshold_type, result, warn, crit)
+          if (threshold_type == 'normal')
+            evaluate_normal(result, warn, crit)
+          elsif (threshold_type == 'reverse')
+            evaluate_reverse(result, warn, crit)
+          else
+            raise "evaluate requires threshold type normal or reverse"
+          end
+        end
+        
+        def evaluate_normal(result, warn, crit)
           # If no result was given return an unknown since converting nil to a float gives 0.0 :(
           return 3 if result.nil?
 
@@ -20,6 +30,26 @@ module Sensu
           elsif result >= crit
             status = 2
           elsif result >= warn
+            status = 1
+          end
+
+          status
+        end
+        
+        def evaluate_reverse(result, warn, crit)
+          # If no result was given return an unknown since converting nil to a float gives 0.0 :(
+          return 3 if result.nil?
+
+          result = result.to_f
+          warn = warn.to_f
+          crit = crit.to_f
+
+          status = 3
+          if result > warn
+            status = 0
+          elsif result <= crit
+            status = 2
+          elsif result <= warn
             status = 1
           end
 

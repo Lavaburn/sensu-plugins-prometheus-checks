@@ -34,10 +34,10 @@ module Sensu
             @output = ''
             @source_nodename_map = nil
 
-            @prometheus = Sensu::Plugins::Prometheus::Client.new
+            @prometheus = Sensu::Plugins::Prometheus::Client.new(@config['config'])
             @metrics =  Sensu::Plugins::Prometheus::Metrics.new(@prometheus)
             @tmpl = Sensu::Plugins::Prometheus::Checks::Output.new
-            @dispatcher = Sensu::Plugins::Events::Dispatcher.new
+            @dispatcher = Sensu::Plugins::Events::Dispatcher.new(@config['config'])
           end
 
           # Drives the evaluation of regular and custom checks, then calls for
@@ -81,6 +81,7 @@ module Sensu
                          else
                            # normal threshold evaluation
                            evaluate(
+                             'normal',
                              metric['value'],
                              check_cfg['warn'],
                              check_cfg['crit']
@@ -100,7 +101,8 @@ module Sensu
                   "check_#{metric['name']}",
                   output,
                   status,
-                  metric['source']
+                  metric['source'],
+                  metric['custom_data']
                 )
               end
             end
@@ -124,9 +126,11 @@ module Sensu
                     value,
                     custom['check']['value']
                   )
-                elsif custom.key?('cfg')
-                  # normal threshold evaluation
+                elsif custom.key?('cfg')        
+                  # Standard threshold evaluation (Warning/Critical)
+                  threshold_type = custom["cfg"]["type"] || 'normal'          
                   status = evaluate(
+                    threshold_type,
                     value,
                     custom['cfg']['warn'],
                     custom['cfg']['crit']
@@ -151,7 +155,8 @@ module Sensu
                   name,
                   output,
                   status,
-                  metric['source'] || '<<UNKNOWN_SOURCE>>'
+                  metric['source'] || '<<UNKNOWN_SOURCE>>',
+                  metric['custom_data']
                 )
               end
             end
@@ -172,6 +177,7 @@ module Sensu
                 )
                 next
               end
+              
               # removing source key to use local's sensu source name (hostname)
               if @config.key?('config') && \
                  @config['config'].key?('use_default_source') && \
@@ -179,8 +185,10 @@ module Sensu
                 log.debug("Removing 'source' from event, using Sensu's default")
                 event.delete('source')
               end
+
               # selecting the non-succesful events
               non_successful_events << event if event['status'] != 0
+
               # dispatching event to Sensu
               @dispatcher.dispatch(event)
             end
@@ -234,7 +242,7 @@ module Sensu
           # Append an event on the pool, making string safe for Sensu, checking
           # "source" against "source_nodename_map" and composing "address" using
           # configuration "domain" entry.
-          def append_event(name, output, status, source)
+          def append_event(name, output, status, source, custom_data)
             # let source-nodename mapping avialable
             @source_nodename_map = source_nodename_map \
               if @source_nodename_map.nil?
@@ -247,17 +255,18 @@ module Sensu
               "[#{status}] check: '#{name}', output: '#{output}', source: '#{nodename}'"
             )
 
-            @events << {
-              'address' => sensu_safe(address),
+            event = {
+              'address' => sensu_safe(address),                                     # TODO: VERIFY THIS!
               'name' => sensu_safe(name),
               'occurrences' => @config['config']['occurrences'] || 1,
               'output' => output,
-              'reported_by' => @config['config']['reported_by'],
+              'reported_by' => @config['config']['reported_by'],                    # TODO: VERIFY THIS!
               'status' => status,
-              'source' => sensu_safe(nodename),
+              'source' => sensu_safe(nodename),                                     # TODO: VERIFY THIS!
               'ttl' => @config['config']['ttl'] || 300,
               'ttl_status' => @config['config']['ttl_status'] || 1
-            }
+            }            
+            @events << event.merge(custom_data) 
           end
         end
       end
