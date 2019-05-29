@@ -17,11 +17,11 @@ module Sensu
 
         # Execute query informed on check's configuration and makes no
         # modifications on value.
-        def custom(cfg)
+        def custom(cfg)          
           source_tpl = false
-          if cfg.key('definition')
+          if cfg.key?('definition')
             definition = cfg['definition']
-            if definition.key('source')
+            if definition.key?('source')
               source_tpl = definition['source']
             end
           end
@@ -42,7 +42,7 @@ module Sensu
             end
             
             definition_rendered = {}
-            if cfg.key('definition')
+            if cfg.key?('definition')
               labels = result['metric']
               labels['SOURCE'] = source
               
@@ -310,14 +310,16 @@ module Sensu
           match = /TEMPLATE_(.*)_TEMPLATE/
           
           lookup_key = template.match(match) { |m|
-            m.captures
+            m.captures[0]
           }
-          
+
           if (lookup_key == nil)
             template            
           else
-            replacement = data[lookup_key]
-            template.sub(match, replacement)
+            replacement = data[lookup_key]     
+            template if replacement == nil
+            
+            template.sub(match, replacement)              
           end
         end
       end

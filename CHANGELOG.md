@@ -47,3 +47,13 @@ Alternative source through fixed Prometheus label
 	
 
 ```
+
+Allow source to be set as-is, address to be optionally removed and don't add reported_by if not set.
+
+```
+
+	config: 
+	  source_lookup: false
+	  show_address: false
+
+```

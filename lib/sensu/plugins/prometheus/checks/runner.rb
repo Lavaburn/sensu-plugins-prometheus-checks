@@ -221,7 +221,7 @@ module Sensu
           # Query Prometheus to discover the nodenames per instance, found on
           # the last day, and sanitize query events into a hash, returned by
           # this method.
-          def source_nodename_map
+          def source_nodename_map                                                                         # TODO: Disable through config ! => Speeds up tests !!!
             map = {}
             @prometheus.query('max_over_time(node_uname_info[1d])').each do |result|
               source = result['metric']['instance']
@@ -243,29 +243,42 @@ module Sensu
           # "source" against "source_nodename_map" and composing "address" using
           # configuration "domain" entry.
           def append_event(name, output, status, source, custom_data)
-            # let source-nodename mapping avialable
-            @source_nodename_map = source_nodename_map \
-              if @source_nodename_map.nil?
-
-            # translating node_exporter hostname into nodename plus domain
-            nodename = @source_nodename_map[source] || source
-            address = "#{nodename}.#{@config['config']['domain']}"
+            source_lookup = true
+            show_address = true
+            
+            source_lookup = @config['config']['source_lookup'] if @config['config'].key?('source_lookup')
+            show_address  = @config['config']['show_address']  if @config['config'].key?('show_address')
+            
+            if source_lookup
+              # let source-nodename mapping avialable
+              @source_nodename_map = source_nodename_map \
+                if @source_nodename_map.nil?
+  
+              # translating node_exporter hostname into nodename plus domain
+              nodename = @source_nodename_map[source] || source
+              address = "#{nodename}.#{@config['config']['domain']}"
+            else
+              nodename = source
+              address = source
+            end
 
             log.info(
               "[#{status}] check: '#{name}', output: '#{output}', source: '#{nodename}'"
             )
 
             event = {
-              'address' => sensu_safe(address),                                     # TODO: VERIFY THIS!
-              'name' => sensu_safe(name),
-              'occurrences' => @config['config']['occurrences'] || 1,
-              'output' => output,
-              'reported_by' => @config['config']['reported_by'],                    # TODO: VERIFY THIS!
+              'name'   => sensu_safe(name),
+              'source' => sensu_safe(nodename),
               'status' => status,
-              'source' => sensu_safe(nodename),                                     # TODO: VERIFY THIS!
-              'ttl' => @config['config']['ttl'] || 300,
-              'ttl_status' => @config['config']['ttl_status'] || 1
-            }            
+              'output' => output,                            
+              'occurrences' => @config['config']['occurrences'] || 1,
+              'ttl'         => @config['config']['ttl'] || 300,
+              'ttl_status'  => @config['config']['ttl_status'] || 1
+            }
+                        
+            event['address'] = sensu_safe(address) if show_address
+            event['reported_by'] = @config['config']['reported_by'] if @config['config']['reported_by']
+              
             @events << event.merge(custom_data) 
           end
         end
