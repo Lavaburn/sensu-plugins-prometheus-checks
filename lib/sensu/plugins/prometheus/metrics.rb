@@ -313,16 +313,15 @@ module Sensu
             m.captures[0]
           }
 
-          if (lookup_key == nil)
-            template            
-          else
-            replacement = data[lookup_key]     
-            template if replacement == nil
-            
-            template.sub(match, replacement)              
-          end
+          return template if lookup_key == nil
+          
+          replacement = data[lookup_key]     
+          return template if replacement == nil
+
+          template.sub(match, replacement)
         end
-      end
+
+      end # end of Class
     end
   end
 end
