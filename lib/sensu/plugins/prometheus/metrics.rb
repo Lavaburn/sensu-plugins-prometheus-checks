@@ -307,7 +307,7 @@ module Sensu
         end
         
         def render_string(template, data)
-          match = /TEMPLATE_(.*)_TEMPLATE/
+          match = /TEMPLATE_(\w*)_TEMPLATE/
           
           lookup_key = template.match(match) { |m|
             m.captures[0]
@@ -318,7 +318,7 @@ module Sensu
           replacement = data[lookup_key]     
           return template if replacement == nil
 
-          template.sub(match, replacement)
+          render_string(template.sub(match, replacement), data)
         end
 
       end # end of Class
