@@ -165,6 +165,9 @@ module Sensu
           # Classify and select whitelisted events to dispatch. Also prepares
           # the final status and output message.
           def evaluate_and_dispatch_events
+            report_failures = true
+            report_failures = @config['config']['report_failures'] if @config['config'].key?('report_failures')
+            
             non_successful_events = []
 
             @events.reverse_each do |event|
@@ -203,7 +206,7 @@ module Sensu
                 "OK: Ran #{amount_checks} checks succesfully on #{amount_events} events!"
             else
               log.debug("#{non_successful_events.length} failed events")
-              @status = 1
+              @status = (report_failures ? 1 : 0)
               non_successful_events.sort_by { |e| e['status'] } .reverse.each do |event|
                 @output << ' | ' unless @output.empty?
                 @output << "Source: #{event['source']}, " \
