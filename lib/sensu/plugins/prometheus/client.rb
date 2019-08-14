@@ -15,8 +15,8 @@ module Sensu
           host, port = prometheus_endpoint(config).split(':')
           log.info("Prometheus at '#{host}':'#{port}'")
           @client = Net::HTTP.new(host, port)
-          @client.read_timeout = 3
-          @client.open_timeout = 3
+          @client.read_timeout = (config.key?('read_timeout') ? config['read_timeout'] : 3)
+          @client.open_timeout = (config.key?('open_timeout') ? config['open_timeout'] : 3)
         end
 
         # Execute query on Prometheus and validate payload. When successful it
